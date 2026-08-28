@@ -30,7 +30,8 @@
 
 ## Deviations from plan
 - Country skew is milder than "top-10 ≈ 70%": measured top-10 = 9.8%, range 3k..1M rows. Still skewed; recorded honestly. Not worth regenerating.
-- 199/200 countries and 99,999/100k products: modulo edge effect of pow() mapping. Immaterial.
+- 199/200 countries and 99,999/100k products: modulo edge effect of pow() mapping. Immaterial to conclusions.
+- Baseline table was later `OPTIMIZE FINAL`-ed during Way 2, changing its compressed size from 2.257 GB to 1.989 GB. All storage comparisons in reports use the optimized baseline.
 
 ## Reproducibility
 Re-run `00_schema.sql` then `01_generate.sql`; verify checksum = 3125091598845950461.
