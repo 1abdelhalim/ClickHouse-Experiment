@@ -2,33 +2,44 @@
 
 Measuring four ways to speed up one analytical query on a 100M-row events table:
 
-1. **ORDER BY / primary-key redesign** — `docs/way1_orderby_report.md`
-2. **Projection** — `docs/way2_projection_report.md`
-3. **Data skipping index** — `docs/way3_skipindex_report.md`
-4. **Materialized view** (precomputation, priced separately) — `docs/way4_mv_report.md`
+1. **ORDER BY / primary-key redesign**
+2. **Projection** (narrow / full / lightweight `_part_offset`)
+3. **Data skipping index** (minmax / set / bloom_filter)
+4. **Materialized view** (precomputation, priced separately)
 
-THE query, dataset design, and methodology: `docs/phase1_report.md` →
-`docs/phase3_report.md`, `docs/dataset.md`, `sql/`.
+## Start here
 
-## Two environments
+- **[docs/v2_report.md](docs/v2_report.md)** — the current consolidated report
+  (2026-08-30, ClickHouse 26.9, 100M rows). Results, mechanism evidence, cost
+  ledger, limitations, verdict.
+- **[docs/critical_review.md](docs/critical_review.md)** — a maintainer-stance
+  critique of the experiment; §12 tracks how each finding was resolved in v2.
+- [docs/dataset.md](docs/dataset.md) — the v2 dataset.
+- [docs/codespaces.md](docs/codespaces.md) — how to reproduce the run.
 
-| | how | results |
-|---|---|---|
-| **Mac (dev)** | `docker compose up -d`, then `CH="docker exec -i ch_experiment clickhouse-client" bench/run.sh …` | `results/*.csv`, `env/manifest.md` |
-| **Linux (quotable)** | GitHub Codespace, ClickHouse native — see `docs/codespaces.md` | `results/linux/`, `env/manifest_linux.md` |
+The Phase 1–3 and Way 1–4 reports are the v1 pass, kept for history with a
+banner pointing here. `docs/mac_vs_linux.md` is the v1 Mac↔Linux cross-check.
 
-The Linux run (done 2026-08-30, CH 26.9, 100M rows) removes the "fanless laptop +
-Docker VM" objection. Result: byte-identical dataset, all correctness hashes and
-cache-independent metrics reproduced, same ranking of the four approaches. Full
-cross-check in **`docs/mac_vs_linux.md`**.
+## Reproduce
+
+```bash
+# in a GitHub Codespace on this repo (native ClickHouse, see docs/codespaces.md)
+bench/run_all.sh --smoke      # ~12 min plumbing check at 12M rows
+bench/run_all.sh              # full run: 100M rows -> results/linux/
+```
+
+`bench/run_all.sh` is host-agnostic (`CH`, `RESULTS_DIR`, `MAX_THREADS` env
+vars); on a dedicated Linux box it runs unchanged and gives harder absolute
+latency numbers.
 
 ## Layout
 
 ```
-sql/            schema, generator, per-way DDL, correctness anchor
-sql/queries/    one SELECT per variant + negative test (used by bench/run_all.sh)
-bench/run.sh    single-query harness (CH + RESULTS_DIR env vars)
-bench/run_all.sh   full pipeline -> results/linux/
-bench/explain.sh / correctness.sh / env_capture.sh / interleave.py / summarize.py
-docs/           per-phase and per-way reports
+sql/            schema, generator ({ROWS} templated), per-way DDL, correctness anchor
+sql/queries/    one SELECT per variant + negative test
+bench/run.sh    single-query harness — hot | cold | directio regimes, CV reported
+bench/run_all.sh   full Phase 1-8 pipeline -> results/linux/
+bench/{explain,correctness,env_capture}.sh, interleave.py, summarize.py
+docs/           v2 report + critical review + v1 history
+results/linux/  the v2 run artifacts
 ```

@@ -1,0 +1,33 @@
+### n1_pointlookup_base  (sql/queries/n1_pointlookup_baseline.sql)
+--- EXPLAIN indexes=1 ---
+Output: event_id, tenant_id, user_id, country, amount
+
+ReadFromMergeTree (exp.events)
+   Read type: Default
+   Parts: 1 | Granules: 1004
+   Output: event_id, tenant_id, user_id, country, amount
+   Prewhere filter
+   Prewhere filter column:  event_id = 61000000
+   Indexes:
+     Min-Max
+       Condition: true
+       Parts: 12/12
+       Granules: 12212/12212
+     Partition
+       Condition: true
+       Parts: 12/12
+       Granules: 12212/12212
+     Statistics
+       Keys:
+         event_id
+       Parts: 1/12
+       Granules: 1004/12212
+     PrimaryKey
+       Condition: true
+       Parts: 1/1
+       Granules: 1004/1004
+     Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events	1	8219292	1004
+

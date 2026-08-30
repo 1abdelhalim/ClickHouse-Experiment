@@ -1,1 +1,3 @@
-way2 build: 192s
+proj_narrow build: 91s
+proj_full build: 208s
+proj_lw build: 109s

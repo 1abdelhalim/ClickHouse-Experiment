@@ -1,4 +1,4 @@
-### way2  (sql/queries/main_way2.sql)
+### way2_proj_full  (sql/queries/main_way2.sql)
 --- EXPLAIN indexes=1 ---
 Output: country, toDate(created_at), count(), sum(amount)
 
@@ -6,13 +6,13 @@ Limit (preliminary LIMIT)
 │  Limit 10
 │  Offset 0
 └──Sorting (Sorting for ORDER BY)
-   │  Sort description: sum(amount) DESC
+   │  Sort description: sum(amount) DESC, country ASC, toDate(created_at) ASC
    │  Limit 10
    └──Aggregating
       │  Keys: country, toDate(created_at)
       │  Aggregates: count(), sum(amount)
       │  Skip merging: 0
-      └──ReadFromMergeTree (proj_country_day)
+      └──ReadFromMergeTree (proj_full)
             Read type: Default
             Parts: 1 | Granules: 53
             Output: created_at, event_type, country, amount

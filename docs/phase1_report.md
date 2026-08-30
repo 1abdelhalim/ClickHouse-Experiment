@@ -1,3 +1,7 @@
+> **⚠️ v1 report — superseded by [docs/v2_report.md](v2_report.md) (2026-08-30).**
+> Kept for history. The v2 rigour pass rebuilt the dataset and harness per
+> `docs/critical_review.md`; numbers here are pre-revision.
+
 # Phase 1 Report — Schema & Dataset
 
 **Status: COMPLETE** — 2026-08-26

@@ -1,0 +1,10 @@
+-- distributions --
+date_min	2024-09-01 00:00:15
+date_max	2025-08-31 23:59:47
+event_types	12
+distinct_tenant	2000
+purchase_share_%	5
+top10_country_share_%	36.9
+distinct_country	199
+top_country_share_%	17.13
+distinct_user	974999

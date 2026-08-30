@@ -1,0 +1,3 @@
+-- MV write amplification (1M rows) --
+wa_plain	846	1000000
+wa_mv	697	1000796

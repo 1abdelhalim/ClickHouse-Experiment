@@ -6,7 +6,7 @@ Limit (preliminary LIMIT)
 │  Limit 10
 │  Offset 0
 └──Sorting (Sorting for ORDER BY)
-   │  Sort description: sum(amount) DESC
+   │  Sort description: sum(amount) DESC, country ASC, toDate(created_at) ASC
    │  Limit 10
    └──Aggregating
       │  Keys: country, toDate(created_at)
@@ -42,5 +42,5 @@ Limit (preliminary LIMIT)
               Ranges: 1
 
 --- EXPLAIN ESTIMATE ---
-exp	events_skip	1	8222817	1004
+exp	events_skip	1	8222000	1004
 
