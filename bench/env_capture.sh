@@ -42,6 +42,15 @@ for i in 1 2 3; do
 done
 echo '```'
 
+echo
+echo "## Analyzer & projection settings"
+echo '```'
+$CH -q "SELECT name, value FROM system.settings
+        WHERE name IN ('enable_analyzer','allow_experimental_analyzer',
+                       'optimize_use_projections','optimize_use_implicit_projections',
+                       'use_query_cache','max_threads') ORDER BY name" 2>/dev/null || true
+echo '```'
+
 cat <<'EOF'
 
 ## Notes

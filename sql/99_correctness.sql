@@ -1,6 +1,6 @@
 -- Correctness anchor: returns a single hash of THE query's full result.
 -- Every variant must return the SAME value as baseline.
--- Baseline value recorded in docs/phase3_report.md.
+-- Baseline value recorded in results/linux/correctness_baseline.txt.
 SELECT cityHash64(groupArray(tuple(country, day, purchases, revenue)))
 FROM
 (
@@ -14,6 +14,6 @@ FROM
       AND created_at >= toDateTime('2025-08-02 00:00:00')
       AND created_at <  toDateTime('2025-09-01 00:00:00')
     GROUP BY country, day
-    ORDER BY revenue DESC
+    ORDER BY revenue DESC, country, day
     LIMIT 10
 );
