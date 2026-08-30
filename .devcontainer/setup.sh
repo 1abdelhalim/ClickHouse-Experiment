@@ -11,6 +11,10 @@
 #     "internally consistent, not absolute"; these are meant to be quotable.
 set -euo pipefail
 
+echo "== installing prerequisites (python3 for the summary/interleave helpers) =="
+sudo apt-get update -q
+sudo apt-get install -y -q python3
+
 echo "== installing ClickHouse (native) =="
 curl -fsSL https://clickhouse.com/ | sh
 sudo ./clickhouse install --noninteractive || sudo ./clickhouse install
