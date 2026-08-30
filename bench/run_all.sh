@@ -34,9 +34,10 @@ echo "ClickHouse: $($CH -q 'SELECT version()')"
 echo "================================================================"
 
 q()  { $CH -q "$1"; }
-bench() { # label qfile [runs] [regime]
-  bench/run.sh "$1" "$2" "${3:-$RUNS}" "${4:-hot}"
+bench() { # label qfile [runs] [regime] — non-fatal
+  bench/run.sh "$1" "$2" "${3:-$RUNS}" "${4:-hot}" || echo "WARN: bench $1 ($4) failed"
 }
+explain() { bench/explain.sh "$1" "$2" || echo "WARN: explain $1 failed"; }
 storage() { # table
   q "SELECT '$1' t, formatReadableSize(sum(bytes_on_disk)) on_disk,
             formatReadableSize(sum(data_compressed_bytes)) compressed,
@@ -93,7 +94,7 @@ storage events | tee "$RESULTS_DIR/storage_baseline.txt"
 # ---------------------------------------------------------------- baseline
 echo; echo "### baseline — THE query"
 quiesce
-bench/explain.sh baseline sql/queries/main_baseline.sql
+explain baseline sql/queries/main_baseline.sql
 bench baseline sql/queries/main_baseline.sql "$RUNS" hot
 bench baseline sql/queries/main_baseline.sql "$RUNS" directio
 echo "correctness(baseline): $(bench/correctness.sh exp.events)" | tee "$RESULTS_DIR/correctness_baseline.txt"
@@ -109,7 +110,7 @@ q "INSERT INTO exp.events_orderby SELECT * FROM exp.events"
 q "OPTIMIZE TABLE exp.events_orderby FINAL"
 echo "way1 build: $(( $(date +%s) - t0 ))s" | tee "$RESULTS_DIR/build_way1.txt"
 quiesce
-bench/explain.sh way1 sql/queries/main_way1.sql
+explain way1 sql/queries/main_way1.sql
 bench way1_orderby sql/queries/main_way1.sql "$RUNS" hot
 bench way1_orderby sql/queries/main_way1.sql "$RUNS" directio
 echo "correctness(way1): $(bench/correctness.sh exp.events_orderby)" | tee "$RESULTS_DIR/correctness_way1.txt"
@@ -129,7 +130,7 @@ way2_variant() { # name  projection-DDL-body   (returns non-zero on any failure)
   q "OPTIMIZE TABLE exp.events FINAL"
   echo "$name build: $(( $(date +%s) - t ))s" | tee -a "$RESULTS_DIR/build_way2.txt"
   quiesce
-  bench/explain.sh way2_$name sql/queries/main_way2.sql
+  explain way2_$name sql/queries/main_way2.sql
   bench way2_$name sql/queries/main_way2.sql "$RUNS" hot
   bench way2_$name sql/queries/main_way2.sql "$RUNS" directio
   echo "correctness(way2_$name): $(bench/correctness.sh exp.events)" | tee -a "$RESULTS_DIR/correctness_way2.txt"
@@ -150,9 +151,9 @@ q "ALTER TABLE exp.events ADD PROJECTION proj_country_day (SELECT event_type, co
 q "ALTER TABLE exp.events MATERIALIZE PROJECTION proj_country_day"
 q "OPTIMIZE TABLE exp.events FINAL"
 quiesce
-bench/explain.sh way2_n3_product sql/queries/n3_product_way2.sql
+explain way2_n3_product sql/queries/n3_product_way2.sql
 bench way2_n3_product sql/queries/n3_product_way2.sql 12 hot
-bench/explain.sh way2_n4_eventtype sql/queries/n4_eventtype_way2.sql
+explain way2_n4_eventtype sql/queries/n4_eventtype_way2.sql
 bench way2_n4_eventtype sql/queries/n4_eventtype_way2.sql 12 hot
 unquiesce
 
@@ -161,7 +162,7 @@ echo; echo "### Way 3 — skip indexes (minmax / set / bloom)"
 $CH < sql/31_skipindex.sql
 q "OPTIMIZE TABLE exp.events_skip FINAL"
 echo "-- forensics --" | tee "$RESULTS_DIR/way3_forensics.txt"
-$CH < sql/30_distribution.sql | tee -a "$RESULTS_DIR/way3_forensics.txt"
+{ $CH < sql/30_distribution.sql || echo "WARN: forensics failed"; } | tee -a "$RESULTS_DIR/way3_forensics.txt"
 quiesce
 for probe in \
   "way3_main:sql/queries/main_way3.sql:$RUNS" \
@@ -169,7 +170,7 @@ for probe in \
   "way3_country_heavy:sql/queries/way3_country_heavy.sql:15" \
   "way3_userid_bloom:sql/queries/way3_userid_bloom.sql:15"; do
   IFS=: read -r name qf rns <<< "$probe"
-  bench/explain.sh "$name" "$qf"
+  explain "$name" "$qf"
   bench "$name" "$qf" "$rns" hot
 done
 bench way3_main sql/queries/main_way3.sql "$RUNS" directio
@@ -193,11 +194,11 @@ q "SELECT 'backfill_ms' k, query_duration_ms, read_rows FROM system.query_log
    WHERE type='QueryFinish' AND query_id='$qid' ORDER BY event_time_microseconds DESC LIMIT 1" \
    | tee "$RESULTS_DIR/way4_backfill.txt"
 quiesce
-bench/explain.sh way4_mv sql/queries/main_way4_mv.sql
+explain way4_mv sql/queries/main_way4_mv.sql
 bench way4_mv sql/queries/main_way4_mv.sql "$RUNS" hot
 bench way4_mv sql/queries/main_way4_mv.sql "$RUNS" directio
 echo "correctness(way4): $(bench/correctness.sh --mv)" | tee "$RESULTS_DIR/correctness_way4.txt"
-bench/explain.sh way4_n5_product sql/queries/n5_product_way4.sql
+explain way4_n5_product sql/queries/n5_product_way4.sql
 bench way4_n5_product sql/queries/n5_product_way4.sql 12 hot
 unquiesce
 storage events_daily_country | tee "$RESULTS_DIR/storage_way4.txt"

@@ -1,15 +1,12 @@
 -- Way 3, Step 1: distribution forensics BEFORE choosing an index.
 --
 -- A skip index prunes a granule only when the filtered value is ABSENT from it.
--- So: measure per-granule concentration of each candidate column, in primary-key
--- order, over THE query's window.
---
---   tenant_id : assigned in contiguous 50k-row blocks, and created_at is
---               monotonic, so a granule spans a tiny tenant range
---               -> minmax index prunes hard.  POSITIVE case.
---   country   : hash-scattered. Heavy countries (c0..) sit in ~every granule;
---               tail countries in a small fraction.  set() index is dead weight
---               for the heavy ones.  NEGATIVE case.
+-- Measure per-granule concentration of each candidate column, in primary-key
+-- order, over THE query's window:
+--   tenant_id : block-assigned + monotonic created_at -> a granule spans a tiny
+--               tenant range -> minmax index prunes hard.  POSITIVE case.
+--   country   : hash-scattered -> ~every granule holds ~every country ->
+--               set() index is dead weight.  NEGATIVE case.
 
 DROP TABLE IF EXISTS exp._tmp_forensics;
 
@@ -26,27 +23,17 @@ FROM
 )
 SETTINGS max_threads = 1;
 
-SELECT 'total_granules_in_window' AS k, toString(ceil(max(rn) / 8192)) AS v FROM exp._tmp_forensics
-UNION ALL
-SELECT 'tenant_distinct_per_granule_p50',
-       toString(quantile(0.5)(u)) FROM (SELECT intDiv(rn-1,8192) g, uniqExact(tenant_id) u FROM exp._tmp_forensics GROUP BY g)
-UNION ALL
-SELECT 'tenant_distinct_per_granule_max',
-       toString(max(u)) FROM (SELECT intDiv(rn-1,8192) g, uniqExact(tenant_id) u FROM exp._tmp_forensics GROUP BY g)
-UNION ALL
-SELECT 'country_distinct_per_granule_p50',
-       toString(quantile(0.5)(u)) FROM (SELECT intDiv(rn-1,8192) g, uniqExact(country) u FROM exp._tmp_forensics GROUP BY g)
-UNION ALL
-SELECT 'country_distinct_per_granule_max',
-       toString(max(u)) FROM (SELECT intDiv(rn-1,8192) g, uniqExact(country) u FROM exp._tmp_forensics GROUP BY g);
+-- distinct values per 8192-row granule
+SELECT
+    'granules_in_window'        AS metric, toString(count())                       AS value FROM (SELECT 1 FROM exp._tmp_forensics GROUP BY intDiv(rn-1, 8192))
+UNION ALL SELECT 'tenant_distinct_per_granule_p50', toString(quantile(0.5)(u)) FROM (SELECT uniqExact(tenant_id) u FROM exp._tmp_forensics GROUP BY intDiv(rn-1,8192))
+UNION ALL SELECT 'tenant_distinct_per_granule_max', toString(max(u))           FROM (SELECT uniqExact(tenant_id) u FROM exp._tmp_forensics GROUP BY intDiv(rn-1,8192))
+UNION ALL SELECT 'country_distinct_per_granule_p50', toString(quantile(0.5)(u)) FROM (SELECT uniqExact(country) u   FROM exp._tmp_forensics GROUP BY intDiv(rn-1,8192))
+UNION ALL SELECT 'country_distinct_per_granule_max', toString(max(u))          FROM (SELECT uniqExact(country) u   FROM exp._tmp_forensics GROUP BY intDiv(rn-1,8192));
 
-SELECT 'granule_coverage_%' AS metric, kind, val, round(countIf(present)/count()*100, 2) AS pct
-FROM
-(
-    SELECT 'tenant' kind, '2900' val, intDiv(rn-1,8192) g, max(tenant_id = 2900) present FROM exp._tmp_forensics GROUP BY g
-    UNION ALL SELECT 'country','c0',   intDiv(rn-1,8192), max(country='c0')   FROM exp._tmp_forensics GROUP BY g
-    UNION ALL SELECT 'country','c120', intDiv(rn-1,8192), max(country='c120') FROM exp._tmp_forensics GROUP BY g
-)
-GROUP BY kind, val ORDER BY kind, val;
+-- granule coverage of the heaviest country (expect ~100% -> set() cannot prune it)
+SELECT 'coverage_country_c0_pct' AS metric,
+       round(countIf(present) / count() * 100, 2) AS value
+FROM (SELECT max(country = 'c0') AS present FROM exp._tmp_forensics GROUP BY intDiv(rn-1, 8192));
 
 DROP TABLE exp._tmp_forensics;
