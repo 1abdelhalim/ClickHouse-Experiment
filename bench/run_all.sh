@@ -21,8 +21,8 @@ cd "$(dirname "$0")/.."
 export CH=${CH:-clickhouse client}
 export RESULTS_DIR=${RESULTS_DIR:-results/linux}
 export MAX_THREADS=${MAX_THREADS:-$(nproc 2>/dev/null || echo 4)}
-ROWS=${ROWS:-120000000}
-export RUNS=${RUNS:-25}
+ROWS=${ROWS:-100000000}
+export RUNS=${RUNS:-20}
 if [[ "${1:-}" == "--smoke" ]]; then ROWS=12000000; RUNS=8; export RUNS; fi
 
 rm -rf "$RESULTS_DIR"; mkdir -p "$RESULTS_DIR"
@@ -177,9 +177,9 @@ bench way3_main sql/queries/main_way3.sql "$RUNS" directio
 echo "correctness(way3): $(bench/correctness.sh exp.events_skip)" | tee "$RESULTS_DIR/correctness_way3.txt"
 unquiesce
 storage events_skip | tee "$RESULTS_DIR/storage_way3.txt"
-q "SELECT name, formatReadableSize(sum(data_compressed_bytes)) sz, sum(marks) mk
-   FROM system.data_skipping_indices WHERE database='exp' AND table='events_skip' GROUP BY name" \
-   | tee -a "$RESULTS_DIR/storage_way3.txt"
+{ q "SELECT name, type_full, formatReadableSize(data_compressed_bytes + marks_bytes) AS sz
+     FROM system.data_skipping_indices WHERE database='exp' AND table='events_skip' ORDER BY name" \
+  || echo "WARN: skip-index storage query failed"; } | tee -a "$RESULTS_DIR/storage_way3.txt"
 
 # ---------------------------------------------------------------- Way 4
 echo; echo "### Way 4 — Materialized View + backfill + write-amp"
