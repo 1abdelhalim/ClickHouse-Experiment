@@ -1,0 +1,653 @@
+================================================================
+run_all  ROWS=100000000  RUNS=15  RESULTS_DIR=results/linux  Sun Aug 30 08:46:20 UTC 2026
+ClickHouse: 26.9.1.375
+================================================================
+
+### Phase 1 — schema + generate 100000000 rows
+100000000
+data checksum:
+3125091598845950461
+events	1.85 GiB	1.85 GiB	3.17 GiB	12	100000000
+
+### baseline — THE query
+### baseline  (sql/queries/main_baseline.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, toDate(created_at), count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, toDate(created_at)
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (exp.events)
+            Read type: Default
+            Parts: 1 | Granules: 1004
+            Output: created_at, country, amount
+            Prewhere filter
+            Prewhere filter column:  created_at < \'2025-09-01 00:00:00\' AND created_at >= \'2025-08-02 00:00:00\' AND event_type = \'purchase\'
+            Indexes:
+              Min-Max
+                Keys:
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), (created_at in [1754092800, +Inf)))
+                Parts: 1/12
+                Granules: 1037/12212
+              Partition
+                Keys:
+                  toYYYYMM(created_at)
+                Condition: and((toYYYYMM(created_at) in (-Inf, 202509]), (toYYYYMM(created_at) in [202508, +Inf)))
+                Parts: 1/1
+                Granules: 1037/1037
+              PrimaryKey
+                Keys:
+                  created_at
+                  event_type
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 1004/1037
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events	1	8222817	1004
+
+== summary: results/linux/baseline_hot.csv ==
+runs=15
+duration_ms  p25=81 p50=115 p75=124 min=80 max=171
+read_rows    p50=8222817
+read_bytes   p50=115119438
+sel_marks    p50=1004
+memory_usage p50=4550264
+done: baseline (hot, 15 runs) -> results/linux/
+correctness (baseline): 10593978362403202577
+
+### Way 1 — ORDER BY (event_type, country, created_at)
+way1 build: 167s
+### way1  (sql/queries/main_way1.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, toDate(created_at), count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, toDate(created_at)
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (exp.events_orderby)
+            Read type: Default
+            Parts: 1 | Granules: 53
+            Output: created_at, country, amount
+            Prewhere filter
+            Prewhere filter column:  event_type = \'purchase\' AND created_at < \'2025-09-01 00:00:00\' AND created_at >= \'2025-08-02 00:00:00\'
+            Indexes:
+              Min-Max
+                Keys:
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), (created_at in [1754092800, +Inf)))
+                Parts: 1/12
+                Granules: 1037/12212
+              Partition
+                Keys:
+                  toYYYYMM(created_at)
+                Condition: and((toYYYYMM(created_at) in (-Inf, 202509]), (toYYYYMM(created_at) in [202508, +Inf)))
+                Parts: 1/1
+                Granules: 1037/1037
+              PrimaryKey
+                Keys:
+                  event_type
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 53/1037
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events_orderby	1	434176	53
+
+== summary: results/linux/way1_orderby_hot.csv ==
+runs=15
+duration_ms  p25=24 p50=26 p75=30 min=22 max=43
+read_rows    p50=434176
+read_bytes   p50=6078464
+sel_marks    p50=53
+memory_usage p50=7963601
+done: way1_orderby (hot, 15 runs) -> results/linux/
+correctness (way1): 10593978362403202577
+== summary: results/linux/n1_userid_base_hot.csv ==
+runs=10
+duration_ms  p25=5 p50=6 p75=6 min=4 max=9
+read_rows    p50=81920
+read_bytes   p50=1107936
+sel_marks    p50=10
+memory_usage p50=1518302
+done: n1_userid_base (hot, 10 runs) -> results/linux/
+== summary: results/linux/n1_userid_ord_hot.csv ==
+runs=10
+duration_ms  p25=4 p50=4 p75=5 min=4 max=6
+read_rows    p50=65536
+read_bytes   p50=1048576
+sel_marks    p50=8
+memory_usage p50=1337220
+done: n1_userid_ord (hot, 10 runs) -> results/linux/
+== summary: results/linux/n2_timerange_base_hot.csv ==
+runs=10
+duration_ms  p25=6 p50=6 p75=6 min=6 max=8
+read_rows    p50=555105
+read_bytes   p50=2220420
+sel_marks    p50=68
+memory_usage p50=3085985
+done: n2_timerange_base (hot, 10 runs) -> results/linux/
+== summary: results/linux/n2_timerange_ord_hot.csv ==
+runs=10
+duration_ms  p25=23 p50=23 p75=24 min=22 max=33
+read_rows    p50=6305889
+read_bytes   p50=25223556
+sel_marks    p50=770
+memory_usage p50=3866815
+done: n2_timerange_ord (hot, 10 runs) -> results/linux/
+events_orderby	1.65 GiB	1.64 GiB	3.17 GiB	12	100000000
+
+### Way 2 — Projection proj_country_day on exp.events
+way2 build: 192s
+### way2  (sql/queries/main_way2.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, toDate(created_at), count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, toDate(created_at)
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (proj_country_day)
+            Read type: Default
+            Parts: 1 | Granules: 53
+            Output: created_at, event_type, country, amount
+            Prewhere filter
+            Prewhere filter column:  event_type = \'purchase\' AND created_at >= \'2025-08-02 00:00:00\' AND created_at < \'2025-09-01 00:00:00\'
+            Indexes:
+              PrimaryKey
+                Keys:
+                  event_type
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 53/1037
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events	1	434176	53
+
+== summary: results/linux/way2_projection_hot.csv ==
+runs=15
+duration_ms  p25=21 p50=22 p75=25 min=19 max=37
+read_rows    p50=434176
+read_bytes   p50=6078464
+sel_marks    p50=53
+memory_usage p50=7948962
+done: way2_projection (hot, 15 runs) -> results/linux/
+correctness (way2): 10593978362403202577
+### way2_n3_product  (sql/queries/n3_product_way2.sql)
+--- EXPLAIN indexes=1 ---
+Output: product_id, count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: product_id
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (proj_country_day)
+            Read type: Default
+            Parts: 1 | Granules: 53
+            Output: event_type, created_at, product_id, amount
+            Prewhere filter
+            Prewhere filter column:  event_type = \'purchase\' AND created_at >= \'2025-08-02 00:00:00\' AND created_at < \'2025-09-01 00:00:00\'
+            Indexes:
+              PrimaryKey
+                Keys:
+                  event_type
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 53/1037
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events	1	434176	53
+
+== summary: results/linux/way2_n3_product_hot.csv ==
+runs=10
+duration_ms  p25=25 p50=27 p75=30 min=24 max=39
+read_rows    p50=434176
+read_bytes   p50=7380992
+sel_marks    p50=53
+memory_usage p50=11758341
+done: way2_n3_product (hot, 10 runs) -> results/linux/
+### way2_n4_eventtype  (sql/queries/n4_eventtype_way2.sql)
+--- EXPLAIN indexes=1 ---
+Output: event_type, count()
+
+Sorting (Sorting for ORDER BY)
+│  Sort description: count() DESC
+└──Aggregating
+   │  Keys: event_type
+   │  Aggregates: count()
+   │  Skip merging: 0
+   └──ReadFromMergeTree (exp.events)
+         Read type: Default
+         Parts: 1 | Granules: 1004
+         Output: event_type
+         Prewhere filter
+         Prewhere filter column:  created_at < \'2025-09-01 00:00:00\' AND created_at >= \'2025-08-02 00:00:00\'
+         Indexes:
+           Min-Max
+             Keys:
+               created_at
+             Condition: and((created_at in (-Inf, 1756684799]), (created_at in [1754092800, +Inf)))
+             Parts: 1/12
+             Granules: 1037/12212
+           Partition
+             Keys:
+               toYYYYMM(created_at)
+             Condition: and((toYYYYMM(created_at) in (-Inf, 202509]), (toYYYYMM(created_at) in [202508, +Inf)))
+             Parts: 1/1
+             Granules: 1037/1037
+           PrimaryKey
+             Keys:
+               created_at
+             Condition: and((created_at in (-Inf, 1756684799]), (created_at in [1754092800, +Inf)))
+             Parts: 1/1
+             Granules: 1004/1037
+             Search Algorithm: binary search
+           Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events	1	8222817	1004
+
+== summary: results/linux/way2_n4_eventtype_hot.csv ==
+runs=10
+duration_ms  p25=45 p50=47 p75=66 min=41 max=161
+read_rows    p50=8222817
+read_bytes   p50=41114085
+sel_marks    p50=1004
+memory_usage p50=1849363
+done: way2_n4_eventtype (hot, 10 runs) -> results/linux/
+proj_country_day	1.64 GiB	100000000
+
+### Way 3 — skip index (forensics first)
+-- distribution forensics --
+countries_per_granule
+198	198	199
+c198_coverage
+123	123	100
+c0_coverage
+30	123	24.4
+### way3_main  (sql/queries/main_way3.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, toDate(created_at), count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, toDate(created_at)
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (exp.events_skip)
+            Read type: Default
+            Parts: 1 | Granules: 1004
+            Output: created_at, country, amount
+            Prewhere filter
+            Prewhere filter column:  created_at < \'2025-09-01 00:00:00\' AND created_at >= \'2025-08-02 00:00:00\' AND event_type = \'purchase\'
+            Indexes:
+              Min-Max
+                Keys:
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), (created_at in [1754092800, +Inf)))
+                Parts: 1/12
+                Granules: 1037/12212
+              Partition
+                Keys:
+                  toYYYYMM(created_at)
+                Condition: and((toYYYYMM(created_at) in (-Inf, 202509]), (toYYYYMM(created_at) in [202508, +Inf)))
+                Parts: 1/1
+                Granules: 1037/1037
+              PrimaryKey
+                Keys:
+                  created_at
+                  event_type
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 1004/1037
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events_skip	1	8222817	1004
+
+== summary: results/linux/way3_skip_main_hot.csv ==
+runs=15
+duration_ms  p25=82 p50=85 p75=115 min=80 max=191
+read_rows    p50=8222817
+read_bytes   p50=115119438
+sel_marks    p50=1004
+memory_usage p50=4488978
+done: way3_skip_main (hot, 15 runs) -> results/linux/
+correctness (way3): 10593978362403202577
+### way3_c0  (sql/queries/way3_c0.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, toDate(created_at), count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, toDate(created_at)
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (exp.events_skip)
+            Read type: Default
+            Parts: 1 | Granules: 240
+            Output: country, created_at, amount
+            Prewhere filter
+            Prewhere filter column:  created_at < \'2025-09-01 00:00:00\' AND created_at >= \'2025-08-02 00:00:00\' AND event_type = \'purchase\' AND country = \'c0\'
+            Indexes:
+              Min-Max
+                Keys:
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), (created_at in [1754092800, +Inf)))
+                Parts: 1/12
+                Granules: 1037/12212
+              Partition
+                Keys:
+                  toYYYYMM(created_at)
+                Condition: and((toYYYYMM(created_at) in (-Inf, 202509]), (toYYYYMM(created_at) in [202508, +Inf)))
+                Parts: 1/1
+                Granules: 1037/1037
+              PrimaryKey
+                Keys:
+                  created_at
+                  event_type
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 1004/1037
+                Search Algorithm: generic exclusion search
+              Skip
+                Name: idx_country_set
+                Description: set GRANULARITY 1
+                Condition: (country in [\'c0\', \'c0\'])
+                Parts: 1/1
+                Granules: 240/1004
+              Ranges: 145
+
+--- EXPLAIN ESTIMATE ---
+exp	events_skip	1	1966080	240
+
+== summary: results/linux/way3_skip_c0_hot.csv ==
+runs=10
+duration_ms  p25=34 p50=36 p75=37 min=34 max=47
+read_rows    p50=1966080
+read_bytes   p50=3342758
+sel_marks    p50=240
+memory_usage p50=531194
+done: way3_skip_c0 (hot, 10 runs) -> results/linux/
+### way3_c198  (sql/queries/way3_c198.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, toDate(created_at), count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, toDate(created_at)
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (exp.events_skip)
+            Read type: Default
+            Parts: 1 | Granules: 1004
+            Output: country, created_at, amount
+            Prewhere filter
+            Prewhere filter column:  created_at < \'2025-09-01 00:00:00\' AND created_at >= \'2025-08-02 00:00:00\' AND event_type = \'purchase\' AND country = \'c198\'
+            Indexes:
+              Min-Max
+                Keys:
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), (created_at in [1754092800, +Inf)))
+                Parts: 1/12
+                Granules: 1037/12212
+              Partition
+                Keys:
+                  toYYYYMM(created_at)
+                Condition: and((toYYYYMM(created_at) in (-Inf, 202509]), (toYYYYMM(created_at) in [202508, +Inf)))
+                Parts: 1/1
+                Granules: 1037/1037
+              PrimaryKey
+                Keys:
+                  created_at
+                  event_type
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 1004/1037
+                Search Algorithm: generic exclusion search
+              Skip
+                Name: idx_country_set
+                Description: set GRANULARITY 1
+                Condition: (country in [\'c198\', \'c198\'])
+                Parts: 1/1
+                Granules: 1004/1004
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events_skip	1	8222817	1004
+
+== summary: results/linux/way3_skip_c198_hot.csv ==
+runs=10
+duration_ms  p25=79 p50=82 p75=86 min=79 max=105
+read_rows    p50=8222817
+read_bytes   p50=48773154
+sel_marks    p50=1004
+memory_usage p50=3477971
+done: way3_skip_c198 (hot, 10 runs) -> results/linux/
+### way3_userid_bloom  (sql/queries/way3_userid_bloom.sql)
+--- EXPLAIN indexes=1 ---
+Output: count(), sum(amount)
+
+Aggregating
+│  Keys:
+│  Aggregates: count(), sum(amount)
+│  Skip merging: 0
+└──ReadFromMergeTree (exp.events_skip)
+      Read type: Default
+      Parts: 12 | Granules: 108
+      Output: amount
+      Prewhere filter
+      Prewhere filter column:  user_id = 424242
+      Indexes:
+        Min-Max
+          Condition: true
+          Parts: 12/12
+          Granules: 12212/12212
+        Partition
+          Condition: true
+          Parts: 12/12
+          Granules: 12212/12212
+        PrimaryKey
+          Condition: true
+          Parts: 12/12
+          Granules: 12212/12212
+        Skip
+          Name: idx_user_bloom
+          Description: bloom_filter GRANULARITY 1
+          Parts: 12/12
+          Granules: 108/12212
+        Ranges: 107
+
+--- EXPLAIN ESTIMATE ---
+exp	events_skip	12	884736	108
+
+== summary: results/linux/way3_userid_bloom_hot.csv ==
+runs=10
+duration_ms  p25=64 p50=65 p75=65 min=61 max=103
+read_rows    p50=884736
+read_bytes   p50=7501560
+sel_marks    p50=108
+memory_usage p50=1323840
+done: way3_userid_bloom (hot, 10 runs) -> results/linux/
+events_skip	1.97 GiB	1.85 GiB	3.17 GiB	12	100000000
+idx_country_set	5.38 MiB
+idx_user_bloom	119.75 MiB
+
+### Way 4 — Materialized View + backfill
+backfill_ms	323	5103616
+### way4_mv  (sql/queries/main_way4_mv.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, day, countMerge(purchases), sumMerge(revenue)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sumMerge(revenue) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, day
+      │  Aggregates: countMerge(purchases), sumMerge(revenue)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (exp.events_daily_country)
+            Read type: Default
+            Parts: 1 | Granules: 9
+            Output: day, country, countMerge(purchases), sumMerge(revenue)
+            Prewhere filter
+            Prewhere filter column:  day < \'2025-09-01\' AND day >= \'2025-08-02\'
+            Indexes:
+              PrimaryKey
+                Keys:
+                  day
+                Condition: and((day in (-Inf, 20331]), (day in [20302, +Inf)))
+                Parts: 1/1
+                Granules: 9/9
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events_daily_country	1	72021	9
+
+== summary: results/linux/way4_mv_hot.csv ==
+runs=15
+duration_ms  p25=7 p50=7 p75=8 min=7 max=9
+read_rows    p50=72021
+read_bytes   p50=3099198
+sel_marks    p50=9
+memory_usage p50=6540521
+done: way4_mv (hot, 15 runs) -> results/linux/
+correctness (way4): 10593978362403202577
+### way4_n5_product  (sql/queries/n5_product_way4.sql)
+--- EXPLAIN indexes=1 ---
+Output: product_id, count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: product_id
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (proj_country_day)
+            Read type: Default
+            Parts: 1 | Granules: 53
+            Output: event_type, created_at, product_id, amount
+            Prewhere filter
+            Prewhere filter column:  event_type = \'purchase\' AND created_at >= \'2025-08-02 00:00:00\' AND created_at < \'2025-09-01 00:00:00\'
+            Indexes:
+              PrimaryKey
+                Keys:
+                  event_type
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 53/1037
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events	1	434176	53
+
+== summary: results/linux/way4_n5_product_hot.csv ==
+runs=10
+duration_ms  p25=26 p50=28 p75=29 min=24 max=598
+read_rows    p50=434176
+read_bytes   p50=7380992
+sel_marks    p50=53
+memory_usage p50=11758149
+done: way4_n5_product (hot, 10 runs) -> results/linux/
+events_daily_country	353.25 KiB	350.26 KiB	1.38 MiB	1	72021
+
+### interleaved re-measurement (A/B/C/D/E round-robin, drift check)
+
+### building SUMMARY.md
+# Linux run — SUMMARY
+
+_dir: `results/linux`_
+
+| label | runs | p50 ms | min | max | read_rows p50 | read_bytes p50 | sel_marks p50 | vs baseline (rows) |
+|---|---|---|---|---|---|---|---|---|
+| baseline | 15 | 117 | 80 | 171 | 8,222,817 | 115,119,438 | 1,004 | 1.0x |
+| n1_userid_base | 10 | 6 | 4 | 9 | 81,920 | 1,107,936 | 10 | 100.4x |
+| n1_userid_ord | 10 | 4 | 4 | 6 | 65,536 | 1,048,576 | 8 | 125.5x |
+| n2_timerange_base | 10 | 6 | 6 | 8 | 555,105 | 2,220,420 | 68 | 14.8x |
+| n2_timerange_ord | 10 | 24 | 22 | 33 | 6,305,889 | 25,223,556 | 770 | 1.3x |
+| way1_orderby | 15 | 27 | 22 | 43 | 434,176 | 6,078,464 | 53 | 18.9x |
+| way2_n3_product | 10 | 30 | 24 | 39 | 434,176 | 7,380,992 | 53 | 18.9x |
+| way2_n4_eventtype | 10 | 49 | 41 | 161 | 8,222,817 | 41,114,085 | 1,004 | 1.0x |
+| way2_projection | 15 | 24 | 19 | 37 | 434,176 | 6,078,464 | 53 | 18.9x |
+| way3_skip_c0 | 10 | 37 | 34 | 47 | 1,966,080 | 3,342,758 | 240 | 4.2x |
+| way3_skip_c198 | 10 | 82 | 79 | 105 | 8,222,817 | 48,773,154 | 1,004 | 1.0x |
+| way3_skip_main | 15 | 96 | 80 | 191 | 8,222,817 | 115,119,438 | 1,004 | 1.0x |
+| way3_userid_bloom | 10 | 65 | 61 | 103 | 884,736 | 7,501,560 | 108 | 9.3x |
+| way4_mv | 15 | 7 | 7 | 9 | 72,021 | 3,099,198 | 9 | 114.2x |
+| way4_n5_product | 10 | 28 | 24 | 598 | 434,176 | 7,380,992 | 53 | 18.9x |
+
+## Interleaved pass (drift-controlled)
+
+| label | rounds | p50 ms | min | max |
+|---|---|---|---|---|
+| baseline | 15 | 24 | 20 | 35 |
+| way1 | 15 | 16 | 14 | 25 |
+| way2 | 15 | 27 | 23 | 36 |
+| way3 | 15 | 87 | 76 | 129 |
+| way4 | 15 | 7 | 7 | 9 |
+
+DONE. Artifacts in results/linux/  (log: results/linux/run_all.log)

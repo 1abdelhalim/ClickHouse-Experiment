@@ -1,0 +1,33 @@
+### way4_mv  (sql/queries/main_way4_mv.sql)
+--- EXPLAIN indexes=1 ---
+Output: country, day, countMerge(purchases), sumMerge(revenue)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sumMerge(revenue) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: country, day
+      │  Aggregates: countMerge(purchases), sumMerge(revenue)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (exp.events_daily_country)
+            Read type: Default
+            Parts: 1 | Granules: 9
+            Output: day, country, countMerge(purchases), sumMerge(revenue)
+            Prewhere filter
+            Prewhere filter column:  day < \'2025-09-01\' AND day >= \'2025-08-02\'
+            Indexes:
+              PrimaryKey
+                Keys:
+                  day
+                Condition: and((day in (-Inf, 20331]), (day in [20302, +Inf)))
+                Parts: 1/1
+                Granules: 9/9
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events_daily_country	1	72021	9
+

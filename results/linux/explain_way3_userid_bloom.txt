@@ -1,0 +1,37 @@
+### way3_userid_bloom  (sql/queries/way3_userid_bloom.sql)
+--- EXPLAIN indexes=1 ---
+Output: count(), sum(amount)
+
+Aggregating
+│  Keys:
+│  Aggregates: count(), sum(amount)
+│  Skip merging: 0
+└──ReadFromMergeTree (exp.events_skip)
+      Read type: Default
+      Parts: 12 | Granules: 108
+      Output: amount
+      Prewhere filter
+      Prewhere filter column:  user_id = 424242
+      Indexes:
+        Min-Max
+          Condition: true
+          Parts: 12/12
+          Granules: 12212/12212
+        Partition
+          Condition: true
+          Parts: 12/12
+          Granules: 12212/12212
+        PrimaryKey
+          Condition: true
+          Parts: 12/12
+          Granules: 12212/12212
+        Skip
+          Name: idx_user_bloom
+          Description: bloom_filter GRANULARITY 1
+          Parts: 12/12
+          Granules: 108/12212
+        Ranges: 107
+
+--- EXPLAIN ESTIMATE ---
+exp	events_skip	12	884736	108
+

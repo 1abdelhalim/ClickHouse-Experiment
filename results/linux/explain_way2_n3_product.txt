@@ -1,0 +1,34 @@
+### way2_n3_product  (sql/queries/n3_product_way2.sql)
+--- EXPLAIN indexes=1 ---
+Output: product_id, count(), sum(amount)
+
+Limit (preliminary LIMIT)
+│  Limit 10
+│  Offset 0
+└──Sorting (Sorting for ORDER BY)
+   │  Sort description: sum(amount) DESC
+   │  Limit 10
+   └──Aggregating
+      │  Keys: product_id
+      │  Aggregates: count(), sum(amount)
+      │  Skip merging: 0
+      └──ReadFromMergeTree (proj_country_day)
+            Read type: Default
+            Parts: 1 | Granules: 53
+            Output: event_type, created_at, product_id, amount
+            Prewhere filter
+            Prewhere filter column:  event_type = \'purchase\' AND created_at >= \'2025-08-02 00:00:00\' AND created_at < \'2025-09-01 00:00:00\'
+            Indexes:
+              PrimaryKey
+                Keys:
+                  event_type
+                  created_at
+                Condition: and((created_at in (-Inf, 1756684799]), and((created_at in [1754092800, +Inf)), (event_type in [\'purchase\', \'purchase\'])))
+                Parts: 1/1
+                Granules: 53/1037
+                Search Algorithm: generic exclusion search
+              Ranges: 1
+
+--- EXPLAIN ESTIMATE ---
+exp	events	1	434176	53
+
