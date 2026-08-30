@@ -1,0 +1,1 @@
+way2 build: 192s

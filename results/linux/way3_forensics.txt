@@ -1,0 +1,7 @@
+-- distribution forensics --
+countries_per_granule
+198	198	199
+c198_coverage
+123	123	100
+c0_coverage
+30	123	24.4
