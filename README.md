@@ -17,8 +17,10 @@ THE query, dataset design, and methodology: `docs/phase1_report.md` →
 | **Mac (dev)** | `docker compose up -d`, then `CH="docker exec -i ch_experiment clickhouse-client" bench/run.sh …` | `results/*.csv`, `env/manifest.md` |
 | **Linux (quotable)** | GitHub Codespace, ClickHouse native — see `docs/codespaces.md` | `results/linux/`, `env/manifest_linux.md` |
 
-The Linux run exists to remove the "fanless laptop + Docker VM" objection. Run
-`bench/run_all.sh` there and cross-check with `docs/mac_vs_linux.md`.
+The Linux run (done 2026-08-30, CH 26.9, 100M rows) removes the "fanless laptop +
+Docker VM" objection. Result: byte-identical dataset, all correctness hashes and
+cache-independent metrics reproduced, same ranking of the four approaches. Full
+cross-check in **`docs/mac_vs_linux.md`**.
 
 ## Layout
 
