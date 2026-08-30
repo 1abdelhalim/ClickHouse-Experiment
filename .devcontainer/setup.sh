@@ -16,8 +16,13 @@ sudo apt-get update -q
 sudo apt-get install -y -q python3
 
 echo "== installing ClickHouse (native) =="
-curl -fsSL https://clickhouse.com/ | sh
-sudo ./clickhouse install --noninteractive || sudo ./clickhouse install
+# Download into a temp dir — the installer drops a ~700MB `clickhouse` binary in
+# CWD, and CWD here is the repo root. Leaving it there risks `git add -A` staging
+# it (and a rejected >100MB push).
+_chtmp=$(mktemp -d)
+( cd "$_chtmp" && curl -fsSL https://clickhouse.com/ | sh \
+  && ( sudo ./clickhouse install --noninteractive || sudo ./clickhouse install ) )
+rm -rf "$_chtmp"
 sudo clickhouse start
 
 # Wait for the server to accept connections.

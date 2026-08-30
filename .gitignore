@@ -1,0 +1,7 @@
+# ClickHouse binary if an installer ever drops it in the tree
+/clickhouse
+/clickhouse-*
+
+# transient transfer artifacts
+*.tgz
+*.b64

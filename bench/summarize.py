@@ -5,7 +5,7 @@ Columns per CSV (from bench/run.sh):
   mode,run,wall_ms,duration_ms,read_rows,read_bytes,memory_usage,
   selected_marks,selected_parts,selected_ranges
 """
-import csv, glob, os, statistics, sys
+import csv, glob, os, sys
 
 d = sys.argv[1] if len(sys.argv) > 1 else "results/linux"
 

@@ -38,11 +38,15 @@ usually in range on 4 cores):
 
 ```bash
 bench/run_all.sh                       # 100M rows, 15 runs/query
-# or, if the smoke run said you need more/less:
-ROWS=200000000 RUNS=20 bench/run_all.sh
+# or, if the smoke run said you need more:
+ROWS=150000000 RUNS=20 bench/run_all.sh
 ```
 
-Full run is roughly 20–40 min wall time.
+Full run is roughly 20–40 min wall time. **Disk ceiling:** the pipeline builds
+four full copies of the table (base + `events_orderby` + projection + `events_skip`)
+plus transient `OPTIMIZE FINAL` space, so ~150M rows is the most that fits a 32 GB
+Codespace. For larger N, create the Codespace with more storage or run
+`bench/run_all.sh` on a bigger box (the scripts only need `CH` + `RESULTS_DIR`).
 
 ## What you get in `results/linux/`
 

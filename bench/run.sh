@@ -55,7 +55,7 @@ run_once() {
     ch -q "SYSTEM DROP MARK CACHE" >/dev/null
     ch -q "SYSTEM DROP UNCOMPRESSED CACHE" >/dev/null
     # Best-effort OS page-cache drop; silently no-ops where not permitted.
-    if [[ -w /proc/sys/vm/drop_caches ]]; then sync; echo 3 > /proc/sys/vm/drop_caches; fi
+    if [[ -w /proc/sys/vm/drop_caches ]]; then sync; echo 3 > /proc/sys/vm/drop_caches || true; fi
   fi
 
   local start end wall_ms
@@ -83,7 +83,6 @@ emit_summary() {
   echo "== summary: $file =="
   awk -F, 'NR>1{
     n++; d[n]=$4+0; rb[n]=$6+0; rr[n]=$5+0; mem[n]=$7+0; sm[n]=$8+0
-    # throttle / drift check: track first vs last third of duration
   } END{
     for(i=2;i<=n;i++){v=d[i];j=i-1;while(j>=1&&d[j]>v){d[j+1]=d[j];j--}d[j+1]=v}
     for(i=2;i<=n;i++){v=rb[i];j=i-1;while(j>=1&&rb[j]>v){rb[j+1]=rb[j];j--}rb[j+1]=v}

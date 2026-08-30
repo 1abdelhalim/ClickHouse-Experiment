@@ -7,7 +7,8 @@
 #
 #   bench/run_all.sh              # full run: 100M rows, 15 measured runs per query
 #   bench/run_all.sh --smoke      # 10M rows, 8 runs  -> sizing / plumbing check
-#   ROWS=300000000 RUNS=20 bench/run_all.sh   # custom
+#   ROWS=150000000 RUNS=20 bench/run_all.sh   # custom (≈150M is the ceiling that
+#                                             #  fits four table copies in 32 GB)
 #
 # The reviewer's advice, baked in:
 #   * native binary, not Docker (setup.sh)
@@ -24,6 +25,10 @@ ROWS=${ROWS:-100000000}
 RUNS=${RUNS:-15}
 if [[ "${1:-}" == "--smoke" ]]; then ROWS=10000000; RUNS=8; fi
 
+# Start clean: this dir is derived output only, and summarize.py aggregates every
+# *_hot.csv it finds — stale files from a previous run (different ROWS, partial
+# run) would silently contaminate SUMMARY.md.
+rm -rf "$RESULTS_DIR"
 mkdir -p "$RESULTS_DIR"
 LOG="$RESULTS_DIR/run_all.log"
 exec > >(tee -a "$LOG") 2>&1
