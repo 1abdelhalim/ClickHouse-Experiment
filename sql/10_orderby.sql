@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS exp.events_orderby;
 CREATE TABLE exp.events_orderby
 (
     event_id   UInt64                  CODEC(Delta, LZ4),
+    tenant_id  UInt32                  CODEC(Delta, LZ4),
     user_id    UInt64                  CODEC(ZSTD(1)),
     event_type LowCardinality(String),
     country    LowCardinality(String),
