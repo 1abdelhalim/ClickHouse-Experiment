@@ -144,6 +144,11 @@ granule** (max 2); `country` = **199 per granule** (fully scattered); `c0`
 coverage **100 %**. The positive and negative cases are the same table, same
 query shape, one column swapped.
 
+> Provenance note: the `way3_country_heavy` probe was run in a separate targeted
+> pass (its query file was briefly missing during the main run); it used the same
+> harness, table, and `SYSTEM STOP MERGES`. Every other number here is from the
+> single `run_all.sh` invocation logged in `results/linux/run_all.log`.
+
 ## 6. Cost ledger
 
 | | one-time build | extra storage | write-path | flexibility lost |
