@@ -1,30 +1,33 @@
 -- Way 3: Data Skipping Index experiment.
--- Forensics (sql/30_distribution.sql) proved country is NOT clustered:
---   - median 198/199 distinct countries per 8192-row granule
---   - c198 in 100% of granules, c0 in 24.4%
--- Therefore a skip index on country should provide little/no pruning.
--- We create it anyway to prove the negative result with measurements.
+--
+-- Three index types on one table, so the positive and negative cases come from
+-- the same data, same query shape, one column swapped:
+--   idx_tenant_minmax : minmax on tenant_id (block-clustered) -> PRUNES HARD
+--   idx_country_set   : set(1000) on country (hash-scattered) -> DEAD WEIGHT for
+--                       heavy countries, useful only for the light tail
+--   idx_user_bloom    : bloom_filter on user_id -> high-cardinality point lookup
+--
+-- Codecs match the baseline for a fair storage comparison. events_skip is a
+-- clean copy of the baseline (no projection) so Way 3 is isolated from Way 2.
 
--- Isolate from Way 2's projection by using a clean copy of the baseline table.
-CREATE TABLE IF NOT EXISTS exp.events_skip
+DROP TABLE IF EXISTS exp.events_skip;
+
+CREATE TABLE exp.events_skip
 (
-    event_id   UInt64,
-    user_id    UInt64,
+    event_id   UInt64                  CODEC(Delta, LZ4),
+    tenant_id  UInt32                  CODEC(Delta, LZ4),
+    user_id    UInt64                  CODEC(ZSTD(1)),
     event_type LowCardinality(String),
     country    LowCardinality(String),
-    product_id UInt32,
-    created_at DateTime,
-    amount     Decimal(10, 2)
+    product_id UInt32                  CODEC(ZSTD(1)),
+    created_at DateTime                CODEC(Delta, LZ4),
+    amount     Decimal(10, 2)          CODEC(ZSTD(1)),
+    INDEX idx_tenant_minmax tenant_id TYPE minmax           GRANULARITY 1,
+    INDEX idx_country_set   country   TYPE set(1000)        GRANULARITY 1,
+    INDEX idx_user_bloom    user_id   TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(created_at)
 ORDER BY (created_at, event_type);
 
 INSERT INTO exp.events_skip SELECT * FROM exp.events;
-
--- Add the index the forensics say shouldn't help, plus a bloom_filter on user_id
--- as a secondary teaching case (high-cardinality point lookups).
-ALTER TABLE exp.events_skip ADD INDEX idx_country_set country TYPE set(512) GRANULARITY 1;
-ALTER TABLE exp.events_skip ADD INDEX idx_user_bloom user_id TYPE bloom_filter(0.01) GRANULARITY 1;
-ALTER TABLE exp.events_skip MATERIALIZE INDEX idx_country_set;
-ALTER TABLE exp.events_skip MATERIALIZE INDEX idx_user_bloom;

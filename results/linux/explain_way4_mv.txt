@@ -6,7 +6,7 @@ Limit (preliminary LIMIT)
 │  Limit 10
 │  Offset 0
 └──Sorting (Sorting for ORDER BY)
-   │  Sort description: sumMerge(revenue) DESC
+   │  Sort description: sumMerge(revenue) DESC, country ASC, day ASC
    │  Limit 10
    └──Aggregating
       │  Keys: country, day
@@ -14,7 +14,7 @@ Limit (preliminary LIMIT)
       │  Skip merging: 0
       └──ReadFromMergeTree (exp.events_daily_country)
             Read type: Default
-            Parts: 1 | Granules: 9
+            Parts: 1 | Granules: 1
             Output: day, country, countMerge(purchases), sumMerge(revenue)
             Prewhere filter
             Prewhere filter column:  day < \'2025-09-01\' AND day >= \'2025-08-02\'
@@ -24,10 +24,10 @@ Limit (preliminary LIMIT)
                   day
                 Condition: and((day in (-Inf, 20331]), (day in [20302, +Inf)))
                 Parts: 1/1
-                Granules: 9/9
-                Search Algorithm: generic exclusion search
+                Granules: 1/9
+                Search Algorithm: binary search
               Ranges: 1
 
 --- EXPLAIN ESTIMATE ---
-exp	events_daily_country	1	72021	9
+exp	events_daily_country	1	7099	1
 

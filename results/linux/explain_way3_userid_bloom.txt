@@ -8,10 +8,10 @@ Aggregating
 │  Skip merging: 0
 └──ReadFromMergeTree (exp.events_skip)
       Read type: Default
-      Parts: 12 | Granules: 108
+      Parts: 12 | Granules: 185
       Output: amount
       Prewhere filter
-      Prewhere filter column:  user_id = 424242
+      Prewhere filter column:  user_id = 9999979
       Indexes:
         Min-Max
           Condition: true
@@ -29,9 +29,9 @@ Aggregating
           Name: idx_user_bloom
           Description: bloom_filter GRANULARITY 1
           Parts: 12/12
-          Granules: 108/12212
-        Ranges: 107
+          Granules: 185/12212
+        Ranges: 179
 
 --- EXPLAIN ESTIMATE ---
-exp	events_skip	12	884736	108
+exp	events_skip	12	1515520	185
 

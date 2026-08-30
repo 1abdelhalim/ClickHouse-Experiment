@@ -1,1 +1,1 @@
-events	1.85 GiB	1.85 GiB	3.17 GiB	12	100000000
+events	1.36 GiB	1.35 GiB	3.54 GiB	12	100000000

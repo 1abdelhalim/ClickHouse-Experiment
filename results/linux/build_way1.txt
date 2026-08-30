@@ -1,1 +1,1 @@
-way1 build: 167s
+way1 build: 150s

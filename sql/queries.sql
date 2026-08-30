@@ -18,5 +18,5 @@ WHERE event_type = 'purchase'
   AND created_at >= toDateTime('2025-08-02 00:00:00')
   AND created_at <  toDateTime('2025-09-01 00:00:00')
 GROUP BY country, day
-ORDER BY revenue DESC
+ORDER BY revenue DESC, country, day
 LIMIT 10;

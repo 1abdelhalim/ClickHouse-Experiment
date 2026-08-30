@@ -1,9 +1,9 @@
 # Environment Manifest — Linux (Codespaces / native)
 
-Captured: 2026-08-30 06:21:08Z
+Captured: 2026-08-30 09:57:34Z
 
 ## ClickHouse
-- Version: **26.9.1.375**
+- Version: **26.9.1.376**
 - Deployment: single node, **native binary** (no Docker), started via `clickhouse start`
 
 ## Host
@@ -16,23 +16,25 @@ Captured: 2026-08-30 06:21:08Z
 
 ## Sanity benchmark (gate: 3 runs within 10%)
 ```
-0.162
-0.158
-0.168
+0.199
+0.174
+0.195
 ```
-spread 6.3% ✅
 
-## Machine
-- GitHub Codespaces, `4 cores, 16 GB RAM, 32 GB storage`
-- Devcontainer: `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` + sshd feature,
-  ClickHouse installed natively by `.devcontainer/setup.sh`
+## Analyzer & projection settings
+```
+| name | value |
+|:-|:-|
+| allow_experimental_analyzer | 1 |
+| enable_analyzer | 1 |
+| max_threads | auto(4) |
+| optimize_use_implicit_projections | 1 |
+| optimize_use_projections | 1 |
+| use_query_cache | 0 |
+```
 
 ## Notes
-- Compare against `env/manifest.md` (the macOS / Docker Desktop run) and
-  `docs/mac_vs_linux.md`.
-- Cold-cache caveat: page cache not droppable, so `read_rows` / `read_bytes` /
+- Compare against `env/manifest.md` (the macOS / Docker Desktop run).
+- Cold-cache caveat: if page cache is not droppable, `read_rows` / `read_bytes` /
   `SelectedMarks` remain the cache-independent ground truth for "work eliminated",
   exactly as on the Mac run. Hot-cache latency medians are the timing metric.
-- I/O-bound operations (large INSERT...SELECT, OPTIMIZE FINAL) are markedly slower
-  here than on the Mac — the Codespace disk is a loop-mounted image on Azure
-  storage. Query latency (CPU/cache-bound) is comparable.

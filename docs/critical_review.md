@@ -364,3 +364,32 @@ run converts the entire latency story from "everything is instant when cached"
 to a real bytes-read → time relationship, and it's an afternoon of work on
 hardware that costs less than lunch. Everything else in this list is polish on
 top of that.
+
+---
+
+## 12. v2 resolution (2026-08-30)
+
+A v2 pass rebuilt the dataset and harness and re-ran on the Codespace
+(`docs/v2_report.md`, `results/linux/`). Status of each item:
+
+| # | item | v2 status |
+|---|---|---|
+| Must 1 | re-scope around read-volume metrics | **done** — v2_report §3 leads with SelectedMarks/read_rows; latency is §4, two regimes, CV-flagged |
+| Must 2 | real I/O measurement | **mitigated** — new `directio` regime (`min_bytes_to_use_direct_io=1`) makes every run do real disk reads; still not I/O-*bound* (working set < RAM) — dedicated box still the only full fix |
+| Must 3 | drop macOS/Docker numbers | **done** — v1 Mac run is history; v2 is Linux-native only, `docs/mac_vs_linux.md` relabelled as the v1 cross-check |
+| Must 4 | pin max_threads / stop merges / dump SETTINGS | **done** — `bench/run.sh` pins `max_threads`, disables query cache; `run_all.sh` `SYSTEM STOP MERGES` + drains before every block; `results/linux/settings.txt` |
+| Must 5 | fix the country-skew claim | **done** — generator now `pow(u,3)`; measured top-country ~17%, top-10 ~37% (was 9.8%); `docs/dataset.md` rewritten from measurement |
+| Should 6 | lightweight projection | **done, negative result** — v2 measures `proj_lw` (`_part_offset`); on 26.9 it was neither smaller than the narrow projection nor auto-selected for THE query (which needs `amount`, absent from it). Reported as-is |
+| Should 7 | codec baseline | **done** — schema specifies `Delta,LZ4` / `ZSTD(1)`; all storage numbers are now real-codec |
+| Should 8 | acknowledge PREWHERE etc. | **done** — baseline EXPLAIN shows the filter auto-moved to PREWHERE; noted in v2_report |
+| Should 9 | CV / MAD per query | **done** — `bench/run.sh` + `summarize.py` report CV, ⚠︎ flag at >10% |
+| Should 10 | event_id job / comment fixes | **done** — `event_id` is now the N1 point-lookup key; 12 real event types; comments corrected |
+| Nice 11 | `index_granularity` lever | **not done** — out of scope for v2 |
+| Nice 12 | isolate MV write-amp | **done** — `run_all.sh` measures a 1M-row insert into a plain copy vs a copy with the MV attached |
+| Nice 13 | realistic `user_id` skew | **done** — generator `pow(u,2)`; power-law, not the v1 bijection |
+
+**Remaining gap:** the environment. A shared Codespace vCPU is not a benchmarking
+platform for *absolute* latency, and the working set still fits in RAM. v2's
+mitigations (directio, pinning, merge-stop, CV, interleaving) make the relative
+comparisons and all read-volume numbers trustworthy; a few hours on a dedicated
+instance is the only thing that would harden the absolute millisecond figures.

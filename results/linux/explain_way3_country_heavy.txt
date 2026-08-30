@@ -1,4 +1,4 @@
-### way3_c0  (sql/queries/way3_c0.sql)
+### way3_country_heavy  (sql/queries/way3_country_heavy.sql)
 --- EXPLAIN indexes=1 ---
 Output: country, toDate(created_at), count(), sum(amount)
 
@@ -6,7 +6,7 @@ Limit (preliminary LIMIT)
 │  Limit 10
 │  Offset 0
 └──Sorting (Sorting for ORDER BY)
-   │  Sort description: sum(amount) DESC
+   │  Sort description: sum(amount) DESC, country ASC, toDate(created_at) ASC
    │  Limit 10
    └──Aggregating
       │  Keys: country, toDate(created_at)
@@ -14,7 +14,7 @@ Limit (preliminary LIMIT)
       │  Skip merging: 0
       └──ReadFromMergeTree (exp.events_skip)
             Read type: Default
-            Parts: 1 | Granules: 240
+            Parts: 1 | Granules: 1004
             Output: country, created_at, amount
             Prewhere filter
             Prewhere filter column:  created_at < \'2025-09-01 00:00:00\' AND created_at >= \'2025-08-02 00:00:00\' AND event_type = \'purchase\' AND country = \'c0\'
@@ -44,9 +44,9 @@ Limit (preliminary LIMIT)
                 Description: set GRANULARITY 1
                 Condition: (country in [\'c0\', \'c0\'])
                 Parts: 1/1
-                Granules: 240/1004
-              Ranges: 145
+                Granules: 1004/1004
+              Ranges: 1
 
 --- EXPLAIN ESTIMATE ---
-exp	events_skip	1	1966080	240
+exp	events_skip	1	8222000	1004
 

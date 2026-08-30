@@ -37,5 +37,5 @@ Sorting (Sorting for ORDER BY)
            Ranges: 1
 
 --- EXPLAIN ESTIMATE ---
-exp	events	1	8222817	1004
+exp	events	1	8222000	1004
 

@@ -1,0 +1,11 @@
+## Non-default settings at run time
+
+## Analyzer / key settings
+allow_experimental_analyzer	1
+enable_analyzer	1
+max_bytes_before_external_group_by	0
+max_threads	auto(4)
+min_bytes_to_use_direct_io	0
+optimize_use_implicit_projections	1
+optimize_use_projections	1
+use_query_cache	0

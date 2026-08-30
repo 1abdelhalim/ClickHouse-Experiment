@@ -1,3 +1,7 @@
+> **⚠️ v1 report — superseded by [docs/v2_report.md](v2_report.md) (2026-08-30).**
+> Kept for history. The v2 rigour pass rebuilt the dataset and harness per
+> `docs/critical_review.md`; numbers here are pre-revision.
+
 # Mac (Docker) vs Linux (Codespaces, native) — cross-check
 
 **Status: COMPLETE — 2026-08-30.** Linux run: `results/linux/`, 100M rows (same

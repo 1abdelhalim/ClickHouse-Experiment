@@ -1,7 +1,7 @@
--- distribution forensics --
-countries_per_granule
-198	198	199
-c198_coverage
-123	123	100
-c0_coverage
-30	123	24.4
+-- forensics --
+granules_in_window	1004
+tenant_distinct_per_granule_p50	1
+country_distinct_per_granule_p50	199
+tenant_distinct_per_granule_max	2
+country_distinct_per_granule_max	199
+coverage_country_c0_pct	100
