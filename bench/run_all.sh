@@ -74,7 +74,8 @@ q "DROP DATABASE IF EXISTS exp"; q "CREATE DATABASE exp"
 $CH < sql/00_schema.sql
 sed "s/{ROWS}/$ROWS/g" sql/01_generate.sql | $CH
 q "SELECT count() FROM exp.events" | tee "$RESULTS_DIR/rowcount.txt"
-q "SELECT sum(cityHash64(*)) FROM exp.events" | tee "$RESULTS_DIR/data_checksum.txt"
+q "SELECT sum(cityHash64(event_id, tenant_id, user_id, event_type, country, product_id, toUInt32(created_at), toString(amount))) FROM exp.events" \
+  | tee "$RESULTS_DIR/data_checksum.txt"
 echo "-- distributions --" | tee "$RESULTS_DIR/distributions.txt"
 q "SELECT 'event_types' k, toString(uniqExact(event_type)) v FROM exp.events
    UNION ALL SELECT 'purchase_share_%', toString(round(countIf(event_type='purchase')/count()*100,2)) FROM exp.events
@@ -166,7 +167,6 @@ for probe in \
   "way3_main:sql/queries/main_way3.sql:$RUNS" \
   "way3_tenant_pos:sql/queries/way3_tenant_pos.sql:15" \
   "way3_country_heavy:sql/queries/way3_country_heavy.sql:15" \
-  "way3_country_light:sql/queries/way3_country_light.sql:15" \
   "way3_userid_bloom:sql/queries/way3_userid_bloom.sql:15"; do
   IFS=: read -r name qf rns <<< "$probe"
   bench/explain.sh "$name" "$qf"
