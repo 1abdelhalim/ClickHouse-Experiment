@@ -81,10 +81,14 @@ the projection transparently (`explain_way2_proj_narrow.txt` shows
 (event_type, country)`) built to **838 MiB — larger than the 747 MiB narrow
 projection** — and the optimiser did **not** select it for THE query, which needs
 `amount` (absent from it). It fell back to a full base-table scan and ran
-*slower* than baseline. On 26.9, via this syntax, the "projection as a
-lightweight secondary index, fetch the rest from the base part" path is not
-transparently used here. The **narrow 4-column normal projection is the practical
-answer**: same 19× read reduction as Way 1, +747 MiB, no base-table rewrite.
+*slower* than baseline. On 26.9, via this 25.5-era `_part_offset` syntax, the
+"projection as a lightweight secondary index, fetch the rest from the base part"
+path is not transparently used here. That is **not** a claim that lightweight
+projections do not work in general: ClickHouse 25.6/25.11 granule-level pruning
+and the 26.1 `PROJECTION … INDEX … TYPE basic` syntax are a follow-up, not
+measured in this run. The **narrow 4-column normal projection is the practical
+answer for this aggregate**: same 19× read reduction as Way 1, +747 MiB, no
+base-table rewrite.
 
 ## 4. Results — latency
 
@@ -92,15 +96,15 @@ Two regimes. **`directio`** sets `min_bytes_to_use_direct_io = 1` so reads use
 O_DIRECT and skip the OS page cache. **`hot`** is fully cached and is only
 meaningful *relative* to other variants.
 
-### Interleaved directio pass — round-robin, drift-controlled (the cleanest comparison)
-
-| approach | p50 ms | min–max | CV |
-|---|--:|--:|--:|
-| Way 4 — MV | **5** | 5–7 | 12 % |
-| Way 1 — ORDER BY | **24** | 20–29 | 8 % |
-| baseline | 27 | 20–42 | 17 % |
-| Way 2 — projection | 29 | 20–36 | 12 % |
-| Way 3 — THE query (index unused) | **132** | 126–146 | 5 % |
+**Do not quote the v2 interleaved table as a fair ranking.** After Way 2
+negatives, `proj_country_day` was left on `exp.events`. `results/linux/interleaved.csv`
+shows the "baseline" reading **434,176 rows / 53 marks** — the projection — while
+the standalone baseline correctly reads 8.22 M / 1,004. The 133 ms (standalone)
+vs 27 ms (interleaved) gap is therefore mostly a leftover projection, not
+Codespace noise. The harness now drops that projection before Way 3/4 and
+interleave; a future run will produce a fair interleaved pass. Until then,
+standalone read-volume (§3) is the source of truth, and standalone latency below
+is directional only.
 
 ### Standalone regimes (per query, measured once in sequence)
 
@@ -114,16 +118,16 @@ meaningful *relative* to other variants.
 
 **Read this honestly:**
 
-- **The ranking is stable in every regime:** MV ≪ Way 1 ≈ Way 2 ≤ baseline ≪
-  Way 3-with-a-dead-index. That ordering is a real result.
-- **Absolute milliseconds are soft.** CV ranges 5–178 %. The standalone-baseline
-  directio p50 (133 ms) and the interleaved-baseline directio p50 (27 ms) are the
-  *same query in the same regime* — the 5× gap is the Codespace's virtual block
-  device caching underneath O_DIRECT plus shared-vCPU jitter. On this platform,
-  even `directio` cannot guarantee a cold read. This is the environment's
-  ceiling; see §7.
-- **Way 3's main query is genuinely ~5× slower than baseline** — it reads the
-  same 1,004 granules *and* checks the `set()` index on every one for nothing.
+- **Read-volume ranking is exact** (see §3): MV ≪ Way 1 = Way 2 narrow/full ≪
+  baseline = Way 3-on-THE-query. Latency ordering is consistent with that, but
+  CVs of 17–178 % mean millisecond deltas are not a result.
+- **Absolute milliseconds are soft.** A shared Codespace vCPU with a virtual
+  block device that caches under O_DIRECT cannot produce quotable cold-cache
+  numbers. See §7.
+- **Way 3's main query is genuinely slower than baseline** on this box — it
+  reads the same 1,004 granules *and* checks the `set()` index on every one for
+  nothing. Treat the ~5× wall-time gap as directional; the unused-index tax is
+  the mechanism.
 
 ## 5. Negative tests — all hold
 
@@ -137,7 +141,7 @@ meaningful *relative* to other variants.
 | **Way 3 — `tenant_id = 1920`** (clustered) | `minmax` prunes hard — POSITIVE | `Skip idx_tenant_minmax: Granules 7 / 1004` → **57,344 rows / 7 marks, 143× fewer, 6 ms** |
 | **Way 3 — `country = 'c0'`** (heavy, 100 % coverage) | `set()` prunes nothing — NEGATIVE | 8,222,000 rows / 1,004 marks — zero pruning |
 | **Way 3 — `user_id = 9999979`** (~84 rows) | bloom prunes granules; over-read is the tax | 1,515,520 rows / 185 marks to find 84 → **82 % granules pruned, 18,000× over-read** |
-| **Way 4 N5** — `GROUP BY product_id` | MV can't serve; projection fallback | served by `proj_country_day`, 53 marks |
+| **Way 4 N5** — `GROUP BY product_id` | MV can't serve; fall back to the raw table | `ReadFromMergeTree (exp.events)`, **1,004 granules / 8.22 M rows** — same in-range scan as baseline. (`explain_way4_n5_product.txt`; SUMMARY `way4_n5_product`) |
 
 Skip-index forensics (`way3_forensics.txt`): `tenant_id` = **1 distinct value per
 granule** (max 2); `country` = **199 per granule** (fully scattered); `c0`
@@ -148,6 +152,11 @@ query shape, one column swapped.
 > pass (its query file was briefly missing during the main run); it used the same
 > harness, table, and `SYSTEM STOP MERGES`. Every other number here is from the
 > single `run_all.sh` invocation logged in `results/linux/run_all.log`.
+>
+> **Correction (2026-09-19):** N5 was previously written as "served by
+> `proj_country_day`, 53 marks." The artifacts show the base table at 1,004
+> granules. The leftover `proj_country_day` on `exp.events` *did* serve the
+> interleaved "baseline" (53 marks); it did not serve N5.
 
 ## 6. Cost ledger
 
@@ -168,39 +177,47 @@ query shape, one column swapped.
 1. **Not bare metal.** A Codespace is a shared-tenant cloud VM with a virtual
    block device that caches beneath O_DIRECT. Mitigations applied: `max_threads`
    pinned, `SYSTEM STOP MERGES` + drain before every measurement block, query
-   cache off, `directio` regime, 20 iterations, interleaved pass, CV reported and
-   flagged at >10 %. **Result:** the read-volume metrics (§3) and the *relative*
-   latency ordering (§4) are trustworthy; the *absolute* millisecond figures are
-   indicative only. A few hours on a dedicated instance is the one thing that
-   would harden them — and `bench/run_all.sh` runs there unchanged (`CH` +
-   `RESULTS_DIR`).
+   cache off, `directio` regime, 20 iterations, CV reported and flagged at >10 %.
+   **Result:** the read-volume metrics (§3) are trustworthy; the *absolute*
+   millisecond figures are indicative only. A few hours on a dedicated instance
+   is the one thing that would harden them — and `bench/run_all.sh` runs there
+   unchanged (`CH` + `RESULTS_DIR`).
 2. **Working set < RAM.** THE query touches ~115 MB. `directio` removes the
    page-cache confound; it does not make the query I/O-*bound* the way a 50 GB
    scan would. Read volume is the honest headline; latency is context.
-3. **Single node**, no replication, no `Nullable`, no TTL. Scope boundary.
-4. **`pow()`/`exp()` shape the skew in floating point** (the uniform inputs are
+3. **v2 interleaved pass is not a fair baseline.** `proj_country_day` remained
+   attached; see §4. Fixed in the harness after this run.
+4. **Single node**, no replication, no `Nullable`, no TTL. Scope boundary.
+5. **`pow()`/`exp()` shape the skew in floating point** (the uniform inputs are
    integer `cityHash64`). The checksum reproduced across Apple M3 and AMD EPYC in
    v1, so this is stable in practice; a fully-integer generator would remove even
    that caveat.
-5. `index_granularity` was not varied (left at 8192).
+6. `index_granularity` was not varied (left at 8192).
+7. Lightweight projections were measured with `_part_offset` syntax, not the
+   26.1 `INDEX … TYPE basic` form.
 
 ## 8. Verdict
 
 Against the bar `docs/critical_review.md` set:
 
-- **Methodology — PASS.** Deterministic generator + checksum + result hash across
-  7 variants; pre-registered hypotheses; mandatory negative tests that found real
-  regressions (N2: 10.9×); optimiser selection verified by EXPLAIN, not assumed;
-  three projection flavours and three skip-index types measured; merge-quiescing,
-  thread pinning, query-cache disable, CV reporting all in place.
+- **Methodology — PASS, with one post-run correction.** Deterministic generator +
+  checksum + result hash across 7 variants; pre-registered hypotheses; mandatory
+  negative tests that found real regressions (N2: 10.9×); optimiser selection
+  verified by EXPLAIN, not assumed; three projection flavours and three
+  skip-index types measured; merge-quiescing, thread pinning, query-cache
+  disable, CV reporting all in place. The v2 interleaved pass is **not** a fair
+  baseline comparison (leftover projection); that is corrected in the harness
+  and must not be published as latency ranking.
 - **Read-volume analysis — PASS.** Exact, mechanism-verified, and every variant
   reproduces the same result hash. 19× (Way 1/2), 1,158× (Way 4), 143× on the
-  skip-index positive case, and honest 1.0× on the three negatives.
+  skip-index positive case, and honest 1.0× on the three negatives. Standalone
+  artifacts, not `interleaved.csv`, are the source of truth.
 - **Absolute latency benchmark — CONDITIONAL.** The rigour controls are all
   present, but a shared Codespace vCPU with block-device caching cannot produce
-  quotable cold-cache milliseconds. The *relative* ordering is solid in every
-  regime. Closing this needs dedicated hardware, not more code.
+  quotable cold-cache milliseconds. Closing this needs dedicated hardware, not
+  more code.
 
 **Bottom line:** v2 is a sound, reproducible analysis of *what each optimisation
 changes about the work ClickHouse does*, with latency reported honestly as
 directional. If the article is scoped that way — and it should be — it stands.
+The draft is `docs/article.md`.

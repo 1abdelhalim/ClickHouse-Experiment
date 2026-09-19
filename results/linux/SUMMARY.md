@@ -38,6 +38,12 @@ _dir: `results/linux`_
 
 ## Interleaved pass (directio, drift-controlled)
 
+**Do not cite this table as a fair baseline.** After Way 2 negatives, `proj_country_day`
+was still on `exp.events`. `interleaved.csv` "baseline" reads 434,176 rows / 53 marks
+(the projection), matching Way 1/2, not the standalone 8.22 M / 1,004. Standalone
+read-volume above is the source of truth. The harness now drops that projection
+before interleave.
+
 | label | rounds | p50 ms | min–max | CV |
 |---|--:|--:|--:|--:|
 | baseline | 20 | 27 | 20–42 | 17% ⚠︎ |

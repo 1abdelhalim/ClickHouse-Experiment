@@ -1,5 +1,7 @@
 -- N5 (Way 4): a query the MV target CANNOT serve (no product_id in it).
--- Run against exp.events (which has the Way 2 projection) to show the fallback.
+-- Run against exp.events after Way 2's negative-test projection has been
+-- dropped, so this is a raw in-range scan — the dual-path you keep if the
+-- rollup does not cover the question.
 SELECT product_id, count() AS c, sum(amount) AS revenue
 FROM exp.events
 WHERE event_type = 'purchase'

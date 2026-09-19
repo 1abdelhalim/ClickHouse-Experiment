@@ -379,7 +379,7 @@ A v2 pass rebuilt the dataset and harness and re-ran on the Codespace
 | Must 3 | drop macOS/Docker numbers | **done** — v1 Mac run is history; v2 is Linux-native only, `docs/mac_vs_linux.md` relabelled as the v1 cross-check |
 | Must 4 | pin max_threads / stop merges / dump SETTINGS | **done** — `bench/run.sh` pins `max_threads`, disables query cache; `run_all.sh` `SYSTEM STOP MERGES` + drains before every block; `results/linux/settings.txt` |
 | Must 5 | fix the country-skew claim | **done** — generator now `pow(u,3)`; measured top-country ~17%, top-10 ~37% (was 9.8%); `docs/dataset.md` rewritten from measurement |
-| Should 6 | lightweight projection | **done, negative result** — v2 measures `proj_lw` (`_part_offset`); on 26.9 it was neither smaller than the narrow projection nor auto-selected for THE query (which needs `amount`, absent from it). Reported as-is |
+| Should 6 | lightweight projection | **done, negative result for this aggregate** — v2 measures `proj_lw` (`_part_offset`); on 26.9 it was neither smaller than the narrow projection nor auto-selected for THE query (needs `amount`). Not a general claim against 26.1 indexing projections |
 | Should 7 | codec baseline | **done** — schema specifies `Delta,LZ4` / `ZSTD(1)`; all storage numbers are now real-codec |
 | Should 8 | acknowledge PREWHERE etc. | **done** — baseline EXPLAIN shows the filter auto-moved to PREWHERE; noted in v2_report |
 | Should 9 | CV / MAD per query | **done** — `bench/run.sh` + `summarize.py` report CV, ⚠︎ flag at >10% |
@@ -390,6 +390,16 @@ A v2 pass rebuilt the dataset and harness and re-ran on the Codespace
 
 **Remaining gap:** the environment. A shared Codespace vCPU is not a benchmarking
 platform for *absolute* latency, and the working set still fits in RAM. v2's
-mitigations (directio, pinning, merge-stop, CV, interleaving) make the relative
-comparisons and all read-volume numbers trustworthy; a few hours on a dedicated
-instance is the only thing that would harden the absolute millisecond figures.
+mitigations (directio, pinning, merge-stop, CV) make the standalone read-volume
+numbers trustworthy; a few hours on a dedicated instance is the only thing that
+would harden the absolute millisecond figures.
+
+**Post-v2 correction (2026-09-19):** the interleaved pass is **not** a fair
+baseline. `bench/run_all.sh` left `proj_country_day` on `exp.events` after Way 2
+negatives, so `results/linux/interleaved.csv` "baseline" reads 434,176 rows / 53
+marks (the projection), not 8.22 M / 1,004. v2_report §4 had attributed the
+133 ms vs 27 ms gap to Codespace noise. N5 was also mis-stated as
+projection-served (53 marks); EXPLAIN shows the base table at 1,004 granules.
+The harness now drops that projection before Way 3/4 and interleave, disables
+`use_query_condition_cache`, emits `EXPLAIN projections=1`, and pins ClickHouse
+26.9.1. Do not publish the v2 interleaved latency table.

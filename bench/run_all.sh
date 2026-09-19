@@ -4,17 +4,21 @@
 # Reproduces Phases 1-8 and writes every artifact to results/linux/ (override
 # with RESULTS_DIR). Runs unattended after .devcontainer/setup.sh.
 #
-#   bench/run_all.sh              # 150M rows, 25 runs/query, hot + directio
+#   bench/run_all.sh              # 100M rows, 20 runs/query, hot + directio
 #   bench/run_all.sh --smoke      # 12M rows, 8 runs -> plumbing check
 #   ROWS=100000000 RUNS=30 bench/run_all.sh
 #
 # Rigour controls (docs/critical_review.md §4):
 #   * max_threads pinned (bench/run.sh, = nproc)
-#   * query result cache disabled per query
+#   * query result cache + query condition cache disabled per query
 #   * SYSTEM STOP MERGES + drain before every measurement block
 #   * each main query measured HOT (relative) and DIRECTIO (O_DIRECT, absolute)
-#   * >=25 iterations, CV reported, interleaved drift pass
+#   * 20 iterations, CV reported, interleaved drift pass
 #   * full non-default SETTINGS + analyzer state captured to the manifest
+#   * Way 2 negative-test projection is DROPped before Way 3/4 and interleave
+#     (v2 run left proj_country_day on exp.events; interleaved baseline was
+#     projection-served — do not treat results/linux/interleaved.csv as a fair
+#     baseline comparison).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -64,6 +68,7 @@ echo; echo "### Phase 0 — environment"
   q "SELECT name, value FROM system.settings
      WHERE name IN ('enable_analyzer','allow_experimental_analyzer','max_threads',
                     'max_bytes_before_external_group_by','use_query_cache',
+                    'use_query_condition_cache',
                     'optimize_use_projections','optimize_use_implicit_projections',
                     'min_bytes_to_use_direct_io') ORDER BY name FORMAT TSV"
 } > "$RESULTS_DIR/settings.txt"
@@ -156,6 +161,7 @@ bench way2_n3_product sql/queries/n3_product_way2.sql 12 hot
 explain way2_n4_eventtype sql/queries/n4_eventtype_way2.sql
 bench way2_n4_eventtype sql/queries/n4_eventtype_way2.sql 12 hot
 unquiesce
+q "ALTER TABLE exp.events DROP PROJECTION IF EXISTS proj_country_day"
 
 # ---------------------------------------------------------------- Way 3
 echo; echo "### Way 3 — skip indexes (minmax / set / bloom)"

@@ -5,7 +5,7 @@
 #   bench/run.sh <label> <query_file> <runs> <regime>
 #     label      : e.g. baseline, way1_orderby  (CSV output name)
 #     query_file : path to .sql containing ONE SELECT (trailing ; is stripped)
-#     runs       : number of MEASURED runs (default $RUNS or 25)
+#     runs       : number of MEASURED runs (default $RUNS or 20)
 #     regime     : hot | cold | directio | all   (default hot)
 #
 # Regimes:
@@ -20,14 +20,15 @@
 #               where absolute latency numbers become defensible.
 #
 # Every measured query runs with a fixed SETTINGS block (see mk_query) so results
-# are reproducible across hosts: max_threads pinned, query cache off.
+# are reproducible across hosts: max_threads pinned, query cache and query
+# condition cache off.
 #
 # Environment:
 #   CH          : ClickHouse client command (default "clickhouse client";
 #                 Docker: "docker exec -i ch_experiment clickhouse-client")
 #   RESULTS_DIR : output dir (default "results")
 #   MAX_THREADS : pinned max_threads (default: nproc)
-#   RUNS        : default measured-run count (default 25)
+#   RUNS        : default measured-run count (default 20)
 #
 # Metrics: system.query_log by query_id (authoritative) + client wall time +
 # granule ProfileEvents (SelectedMarks/Parts/Ranges — not top-level columns).
@@ -36,7 +37,7 @@ set -euo pipefail
 
 LABEL=${1:?"label required"}
 QFILE=${2:?"query file required"}
-RUNS=${3:-${RUNS:-25}}
+RUNS=${3:-${RUNS:-20}}
 REGIME=${4:-hot}
 WARMUP=3
 CH=${CH:-clickhouse client}
@@ -55,7 +56,7 @@ CSV_HEADER="regime,run,wall_ms,duration_ms,read_rows,read_bytes,memory_usage,sel
 
 mk_query() {  # $1 = regime — echoes the query with its SETTINGS block
   local regime=$1
-  local settings="max_threads=${MAX_THREADS}, use_query_cache=0"
+  local settings="max_threads=${MAX_THREADS}, use_query_cache=0, use_query_condition_cache=0"
   [[ "$regime" == "directio" ]] && settings="${settings}, min_bytes_to_use_direct_io=1"
   printf '%s\nSETTINGS %s' "$RAW_QUERY" "$settings"
 }
@@ -64,6 +65,7 @@ drop_ch_caches() {
   ch -q "SYSTEM DROP MARK CACHE" >/dev/null
   ch -q "SYSTEM DROP UNCOMPRESSED CACHE" >/dev/null
   ch -q "SYSTEM DROP QUERY CACHE" >/dev/null 2>&1 || true
+  ch -q "SYSTEM DROP QUERY CONDITION CACHE" >/dev/null 2>&1 || true
 }
 
 run_once() {  # $1 = regime, $2 = run index. Appends one CSV line.

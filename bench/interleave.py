@@ -7,7 +7,7 @@ every variant equally instead of being confounded with the variant itself.
 
 Env:
   CH                 client command (default "clickhouse client")
-  INTERLEAVE_ROUNDS  rounds (default 25)
+  INTERLEAVE_ROUNDS  rounds (default 20)
   INTERLEAVE_REGIME  "hot" (default) or "directio" (O_DIRECT + drop CH caches each run)
   MAX_THREADS        pinned max_threads (default 4)
 
@@ -16,12 +16,12 @@ CSV to stdout: round,label,wall_ms,duration_ms,read_rows,read_bytes,selected_mar
 import os, subprocess, sys, time
 
 CH = os.environ.get("CH", "clickhouse client").split()
-ROUNDS = int(os.environ.get("INTERLEAVE_ROUNDS", "25"))
+ROUNDS = int(os.environ.get("INTERLEAVE_ROUNDS", "20"))
 REGIME = os.environ.get("INTERLEAVE_REGIME", "hot")
 MAX_THREADS = os.environ.get("MAX_THREADS", "4")
 WARMUP = 2
 
-SETTINGS = f"max_threads={MAX_THREADS}, use_query_cache=0"
+SETTINGS = f"max_threads={MAX_THREADS}, use_query_cache=0, use_query_condition_cache=0"
 if REGIME == "directio":
     SETTINGS += ", min_bytes_to_use_direct_io=1"
 
@@ -32,7 +32,12 @@ def ch(sql, qid=None):
 
 
 def drop_caches():
-    for c in ("SYSTEM DROP MARK CACHE", "SYSTEM DROP UNCOMPRESSED CACHE", "SYSTEM DROP QUERY CACHE"):
+    for c in (
+        "SYSTEM DROP MARK CACHE",
+        "SYSTEM DROP UNCOMPRESSED CACHE",
+        "SYSTEM DROP QUERY CACHE",
+        "SYSTEM DROP QUERY CONDITION CACHE",
+    ):
         try:
             ch(c)
         except subprocess.CalledProcessError:

@@ -2,6 +2,7 @@
 # bench/explain.sh — mechanism evidence for one query:
 #   * EXPLAIN indexes = 1   — which table/projection/index, parts + granules kept,
 #                             and whether the filter moved to PREWHERE
+#   * EXPLAIN indexes = 1, projections = 1 — projection substitution (Way 2)
 #   * EXPLAIN ESTIMATE      — rows the optimiser expects to scan
 # Writes results/<dir>/explain_<label>.txt
 #   usage: bench/explain.sh <label> <query_file>
@@ -17,6 +18,9 @@ OUT="${RESULTS_DIR}/explain_${LABEL}.txt"
   echo "### $LABEL  ($QFILE)"
   echo "--- EXPLAIN indexes=1 ---"
   $CH -q "EXPLAIN indexes = 1 $Q"
+  echo
+  echo "--- EXPLAIN indexes=1, projections=1 ---"
+  $CH -q "EXPLAIN indexes = 1, projections = 1 $Q" || echo "(projections=1 not supported on this version)"
   echo
   echo "--- EXPLAIN ESTIMATE ---"
   $CH -q "EXPLAIN ESTIMATE $Q"
